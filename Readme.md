@@ -1,6 +1,7 @@
 # iMac Display Brightness Control for Ubuntu using ESP32
 
 This guide explains how to control an iMac display's brightness in Ubuntu using an ESP32 microcontroller. This solution is particularly useful for iMacs running Ubuntu where the standard brightness controls don't work.
+Derived from https://medium.com/@fixingthings/imac-2009-2010-2011-gpu-upgrade-fixing-led-lcd-pwm-brightness-with-an-esp32-bc32da61a0e7 and adapted for Ubuntu.
 
 ## Hardware Requirements
 
