@@ -115,57 +115,106 @@ def save_config(brightness):
 def setup_serial(port='/dev/ttyUSB0'):
     try:
         ser = serial.Serial(port, 115200, timeout=2)
-        time.sleep(1)
+        time.sleep(1)  # Wait for connection to stabilize
         return ser
     except serial.SerialException as e:
         print(f"Error: Could not open serial port {port}")
         print(f"Details: {e}")
         return None
 
-def set_brightness(ser, value):
+# def set_brightness(ser, value):
+#     """Set brightness with safety limits"""
+#     try:
+#         # Ensure brightness is between 5-100%
+#         value = max(0, min(100, value))
+#         ser.write(f"{value}\n".encode())
+#         time.sleep(0.1)  # Wait for response
+#         response = ser.readline().decode().strip()
+#         print(f"Set brightness to {value}%")
+#         save_config(value)  # Save the current brightness
+#         return value
+#     except Exception as e:
+#         print(f"Error setting brightness: {e}")
+#         return None
+def set_brightness(ser, value, allow_zero=False):
+    """Set brightness with safety limits
+    
+    Args:
+        ser: Serial connection
+        value: Brightness value to set
+        allow_zero: If True, allows 0%, otherwise enforces 5% minimum
+    """
     try:
-        value = max(5, min(100, value))
+        if allow_zero:
+            value = max(0, min(100, value))
+        else:
+            value = max(5, min(100, value))
+            
         ser.write(f"{value}\n".encode())
-        time.sleep(0.1)
+        time.sleep(0.1)  # Wait for response
         response = ser.readline().decode().strip()
         print(f"Set brightness to {value}%")
-        save_config(value)
+        save_config(value)  # Save the current brightness
         return value
     except Exception as e:
         print(f"Error setting brightness: {e}")
         return None
 
 def get_brightness():
+    """Get last saved brightness value"""
     config = load_config()
     return config.get('last_brightness', 70)
 
 def main():
     parser = argparse.ArgumentParser(description='iMac Display Brightness Control')
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('-s', '--set', type=int, help='Set brightness (5-100)')
+    group.add_argument('-s', '--set', type=int, help='Set brightness (5-100, or 0 with -z)')
     group.add_argument('-g', '--get', action='store_true', help='Get current brightness')
     group.add_argument('-i', '--increment', type=int, help='Increase brightness by amount')
     group.add_argument('-d', '--decrement', type=int, help='Decrease brightness by amount')
     parser.add_argument('-p', '--port', default='/dev/ttyUSB0', help='Serial port')
+    parser.add_argument('-z', '--allow-zero', action='store_true', help='Allow setting brightness to 0')
     args = parser.parse_args()
+
+    # Debug prints to see what's happening
+    print(f"Command arguments: {args}")
 
     if args.get:
         print(get_brightness())
         return
 
+    # Setup serial connection for all operations that need it
     if args.set is not None or args.increment is not None or args.decrement is not None:
         ser = setup_serial(args.port)
-        if ser:
+        if not ser:
+            print("Failed to setup serial connection")
+            return
+
+        try:
             current = get_brightness()
+            print(f"Current brightness: {current}")
+
             if args.set is not None:
-                new_value = args.set
+                # Explicit check for zero setting
+                if args.set == 0 and not args.allow_zero:
+                    print("Error: Cannot set brightness to 0 without --allow-zero (-z) flag")
+                    return
+                print(f"Setting brightness to {args.set} with allow_zero={args.allow_zero}")
+                set_brightness(ser, args.set, allow_zero=args.allow_zero)
+            
             elif args.increment is not None:
                 new_value = min(current + args.increment, 100)
+                print(f"Incrementing brightness to {new_value}")
+                set_brightness(ser, new_value, allow_zero=False)
+            
             elif args.decrement is not None:
                 new_value = max(current - args.decrement, 5)
-            
-            set_brightness(ser, new_value)
+                print(f"Decrementing brightness to {new_value}")
+                set_brightness(ser, new_value, allow_zero=False)
+        
+        finally:
             ser.close()
+            print("Serial connection closed")
     else:
         parser.print_help()
 
