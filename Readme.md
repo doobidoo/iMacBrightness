@@ -32,38 +32,59 @@ Using PlatformIO in Visual Studio Code:
 ```cpp
 #include <Arduino.h>
 
-const int pwmPin = 23;        // GPIO23 for PWM output
+// Define the PWM properties
+const int pwmPin = 23;        // GPIO23/D23 for PWM output
 const int pwmFreq = 10000;    // 10kHz PWM frequency
 const int pwmChannel = 0;     // PWM channel (0-15)
 const int pwmResolution = 8;  // 8-bit resolution (0-255)
 const int ledPin = 2;         // Built-in LED for status
 
 void setup() {
+  // Configure Serial communication
   Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, HIGH);
   
+  // Configure status LED
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, HIGH);  // Turn on LED to show we're running
+  
+  // Configure PWM
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(pwmPin, pwmChannel);
   
+  // Set initial brightness to 70%
   int initialBrightness = (70 * 255) / 100;
   ledcWrite(pwmChannel, initialBrightness);
   
   Serial.println("ESP32 LCD Brightness Control Ready");
+  Serial.println("Send values 0-100 for brightness percentage");
 }
 
 void loop() {
   if (Serial.available() > 0) {
+    // Read the incoming brightness value
     String input = Serial.readStringUntil('\n');
     int percentBrightness = input.toInt();
-    percentBrightness = constrain(percentBrightness, 5, 100);
-    int pwmValue = map(percentBrightness, 5, 100, 13, 255);
     
+    // Convert percentage (0-100) to PWM value (0-255)
+    // Enforce minimum brightness of 0%
+    percentBrightness = constrain(percentBrightness, 0, 100);
+    int pwmValue = map(percentBrightness, 0, 100, 0, 255);
+    
+    // Additional safety check
+    if (pwmValue < 13) {
+        //pwmValue = 13;  // Minimum safe brightness
+        Serial.println("Warning: a minimum safe brightness is 5%");
+    }
+    
+    // Apply the brightness
     ledcWrite(pwmChannel, pwmValue);
+    
+    // Blink status LED to show we received command
     digitalWrite(ledPin, LOW);
     delay(50);
     digitalWrite(ledPin, HIGH);
     
+    // Send confirmation
     Serial.print("Brightness set to: ");
     Serial.print(percentBrightness);
     Serial.println("%");
@@ -122,20 +143,6 @@ def setup_serial(port='/dev/ttyUSB0'):
         print(f"Details: {e}")
         return None
 
-# def set_brightness(ser, value):
-#     """Set brightness with safety limits"""
-#     try:
-#         # Ensure brightness is between 5-100%
-#         value = max(0, min(100, value))
-#         ser.write(f"{value}\n".encode())
-#         time.sleep(0.1)  # Wait for response
-#         response = ser.readline().decode().strip()
-#         print(f"Set brightness to {value}%")
-#         save_config(value)  # Save the current brightness
-#         return value
-#     except Exception as e:
-#         print(f"Error setting brightness: {e}")
-#         return None
 def set_brightness(ser, value, allow_zero=False):
     """Set brightness with safety limits
     
@@ -267,6 +274,7 @@ imacdisplay.py -d 10
 - Fan control might need mbpfan package
 - Initial brightness is set to 70%
 - The script maintains a configuration file at `~/.config/imacdisplay.conf`
+- Optional: install [imac_idle.py](imac_idle.md) to turn off the backlight when idle and turn it back on by keystroke.
 
 ## Troubleshooting
 
