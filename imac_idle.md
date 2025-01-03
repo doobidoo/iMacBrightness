@@ -1,4 +1,6 @@
 ## iMac Idle Script for Ubuntu
+This script is optional when you whish to have your backlight turn of after 60 seconds of idle time and it is only working together with the script documented in the [Readme.md](Readme.md).
+The screen turns back on on keystroke.
 
 ### **Script: `imac_idle.py`**
 ```python
